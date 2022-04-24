@@ -1,76 +1,94 @@
 import React, { useState } from 'react';
 import {useQuery} from 'react-query';
 // components 
-import { Container, GridJustification, Button, Typography, Card, CardContent, CardActions, CardActionArea} from '@material-ui/core';
+import { Container, GridJustification, Button, Typography, Card, CardContent, CardActions, CardActionArea, Drawer, LinearProgress, Grid, Badge} from '@material-ui/core';
 import CardMedia from '@material-ui/core/CardMedia';
 import {makeStyles} from '@material-ui/core/styles'
-import { Grid } from '@material-ui/core';
+import AddShoppingCartIcon from '@material-ui/icons/AddShoppingCart';
+import Item from './Items/Item';
+import Cart from './Cart/Cart'
 // styles
-import { Wrapper } from './App.style';
+import { Wrapper, StyledButton } from './App.style';
 //types
-// export type CartItemType = {
-//   id: number;
-//   email: string;
-//   first_name: string;
-//   last_name: string;
-//   avatar: string;
-// };
+export type CartItemType = {
+  id: number;
+  category: string;
+  description: string;
+  image: string;
+  price: number;
+  title: string;
+  amount: number;
+};
 
-// type Props = {
-//   item: CartItemType,
-//   handleAddToCart: (clickedItem: CartItemType) => void;
-// }
 
-const useStyles = makeStyles((theme) =>({
-  root: {
-    minWidth: '100%',   
-    minHeight: '100%',    
-    paddingTop: theme.spacing(),
-  },
-  card:{
-    backgroundColor:theme.palette.grey[200]
-  },
-  grid:{
-    width:"100vw",
-    marginLeft:"0"
-  }
-}));
+
+const getProducts = async(): Promise<CartItemType[]> => await(await fetch("https://fakestoreapi.com/products")).json();
+
   
-  export default function App() {
-    const classes = useStyles();
-    const [users, setUsers] = React.useState([]);
-    const f = async () => {
-      const res = await fetch("https://reqres.in/api/users/");
-      const json = await res.json();
-      setUsers(json.data);
-    };
-    React.useEffect(() => {
-      f();
-    }, []);
-    return (
-      <Container className={classes.root}>
-        <Grid container spacing={5}>
-          {users.length &&
-            users.map((user) => {
-              return (
-                <Grid item sm={3}>{/* card  */}
-                  <Card className={classes.card}>
-                    <CardActionArea>
-                      <CardMedia component="img" image={user.avatar}   />
-                        <CardContent>
-                            <Typography variant='h5'>{user.first_name} {user.last_name}</Typography>
-                            <Typography variant='subtitle1'>ID : {user.id}</Typography>
-                            <Typography variant='subtitle1'>Email ID : {user.email}</Typography>
-                        </CardContent>
-                    </CardActionArea>
-                    </Card>
-                  </Grid>
-              );
-            })}
-        </Grid>
-      </Container>
-    );
-  }
+export default function App() {
+
+  const [cartOpen, setCartOpen] = useState(false);
+  const[cartItems, setCartItems] = useState([] as CartItemType[]);
+  const{data, isLoading, error} = useQuery<CartItemType[]>("products", getProducts)
+  console.log(data)
+
+  const getTotalItem = (items: CartItemType[]) => {
+    return items.reduce((ack: number, item) => ack + item.amount, 0);
+  };
+
+  const handleAddToCart = (clickedItem: CartItemType) => {
+    setCartItems(prev => {
+      const isItemInCart = prev.find(Item => Item.id === clickedItem.id)
+
+      if(isItemInCart){
+        return prev.map(item => (
+          item.id === clickedItem.id ? {...item, amount: item.amount+1}
+          :item
+        ))
+      }
+      return [...prev, {...clickedItem, amount: 1}];
+    })
+  };
+  
+  const handleRemoveFromCart = (id: number) => {
+    setCartItems(prev =>
+      prev.reduce((ack, item) => {
+        if(item.id === id){
+          if(item.amount === 1){
+            return ack;
+          } 
+          return [...ack, {...item, amount: item.amount-1}];
+        }else{
+          return[...ack, item]
+        }
+      }, [] as CartItemType[])
+    )
+  };
+
+  if(isLoading) return <LinearProgress/>;
+  if(error) return <div>Oops..! 404</div>
+
+  return (
+    <Wrapper>
+      <Drawer anchor='right' open={cartOpen} onClose={()=>setCartOpen(false)}>
+        <Cart cartItems={cartItems} addToCart = {handleAddToCart} removeFromCart = {handleRemoveFromCart}> 
+
+        </Cart>
+      </Drawer>
+      <StyledButton onClick={() => setCartOpen(true)}>
+        <Badge badgeContent={getTotalItem(cartItems)} color = "error">
+          <AddShoppingCartIcon/>
+        </Badge>
+      </StyledButton>
+      <Grid container spacing={3}> 
+        {data?.map((item => (
+          <Grid item key={item.id} xs={12} sm={4}>
+            <Item item={item} handleAddToCart={handleAddToCart}/>
+          </Grid>
+        )))}
+      </Grid>
+    </Wrapper>
+  );
+}
 
 
-    
